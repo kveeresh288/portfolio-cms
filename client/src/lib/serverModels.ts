@@ -23,10 +23,11 @@ const UserSchema = new Schema<IUser>({
   isMfaEnabled: { type: Boolean, default: false },
   mfaSecret: { type: String, select: false },
 });
-UserSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
+// Mongoose v9: async hooks must NOT call next() — just return a Promise
+UserSchema.pre('save', async function () {
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 12);
+  }
 });
 UserSchema.methods.comparePassword = function (c: string) { return bcrypt.compare(c, this.password); };
 
