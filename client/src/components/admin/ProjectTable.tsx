@@ -10,8 +10,8 @@ import { api } from '@/lib/api';
 import ProjectModal from './ProjectModal';
 
 interface ProjectTableProps {
-  /** Called whenever the project count changes so the Overview tab stays in sync */
-  onCountChange?: (count: number) => void;
+  /** Called whenever projects change; passes total count and featured count */
+  onCountChange?: (total: number, featured: number) => void;
 }
 
 // ─── Loading skeleton ──────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ export default function ProjectTable({ onCountChange }: ProjectTableProps) {
       const res = await api.projects.list();
       const data = res.data ?? [];
       setProjects(data);
-      onCountChange?.(data.length);
+      onCountChange?.(data.length, data.filter((p) => p.featured).length);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load projects';
       setError(msg);
@@ -91,7 +91,7 @@ export default function ProjectTable({ onCountChange }: ProjectTableProps) {
       );
       const updated = [res.data!, ...projects];
       setProjects(updated);
-      onCountChange?.(updated.length);
+      onCountChange?.(updated.length, updated.filter((p) => p.featured).length);
       toast.success('Project created');
     }
     setShowModal(false);
@@ -106,7 +106,7 @@ export default function ProjectTable({ onCountChange }: ProjectTableProps) {
       await api.projects.delete(project._id);
       const updated = projects.filter((p) => p._id !== project._id);
       setProjects(updated);
-      onCountChange?.(updated.length);
+      onCountChange?.(updated.length, updated.filter((p) => p.featured).length);
       toast.success('Project deleted');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed');
@@ -120,7 +120,9 @@ export default function ProjectTable({ onCountChange }: ProjectTableProps) {
     try {
       // Inline PATCH-style update  →  PUT /api/projects/:id  { featured: !current }
       const res = await api.projects.update(project._id, { featured: !project.featured });
-      setProjects((prev) => prev.map((p) => (p._id === project._id ? res.data! : p)));
+      const updated = projects.map((p) => (p._id === project._id ? res.data! : p));
+      setProjects(updated);
+      onCountChange?.(updated.length, updated.filter((p) => p.featured).length);
       toast.success(res.data?.featured ? 'Marked as featured' : 'Removed from featured');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Toggle failed');
