@@ -2,11 +2,14 @@
   "name": "portfolio-server",
   "version": "1.0.0",
   "description": "Portfolio CMS Backend API",
-  "main": "dist/server.js",
+  "main": "dist/src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "seed": "ts-node scripts/seed.ts",
     "reset-totp": "ts-node scripts/reset-totp.ts"
   },
