@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { TOTP, verify as totpVerify } from 'otplib';
+import { verify as totpVerify } from 'otplib';
 import { connectDB } from '@/lib/db';
 import { User } from '@/lib/serverModels';
 import { signToken, setAuthCookie, JwtPayload } from '@/lib/serverAuth';
-
-const _totp = new TOTP();
-void _totp;
 
 export async function POST(req: NextRequest) {
   try {

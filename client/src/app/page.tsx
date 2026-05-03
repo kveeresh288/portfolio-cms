@@ -1,5 +1,4 @@
-import { serverFetch } from '@/lib/api';
-import { Project, Skill, SiteProfile, DEFAULT_PROFILE } from '@/lib/types';
+import { DEFAULT_PROFILE, Project, Skill, SiteProfile } from '@/lib/types';
 import { MOCK_PROJECTS, MOCK_SKILLS } from '@/data/mock';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -10,13 +9,34 @@ import Projects from '@/components/sections/Projects';
 import Resources from '@/components/sections/Resources';
 import Contact from '@/components/sections/Contact';
 
-export default async function HomePage() {
-  const [projects, skills, profile] = await Promise.all([
-    serverFetch<Project[]>('/projects'),
-    serverFetch<Skill[]>('/skills'),
-    serverFetch<SiteProfile>('/profile'),
-  ]);
+// Fetch data directly from MongoDB in the Server Component (no HTTP hop)
+async function getData() {
+  try {
+    const { connectDB } = await import('@/lib/db');
+    const { Project: ProjectModel, Skill: SkillModel, SiteProfile: ProfileModel } = await import('@/lib/serverModels');
+    await connectDB();
 
+    const [projects, skills, profile] = await Promise.all([
+      ProjectModel().find().sort({ featured: -1, order: 1, createdAt: -1 }).lean(),
+      SkillModel().find().sort({ category: 1, order: 1 }).lean(),
+      ProfileModel().findOne().lean(),
+    ]);
+
+    return {
+      projects: JSON.parse(JSON.stringify(projects)) as Project[],
+      skills: JSON.parse(JSON.stringify(skills)) as Skill[],
+      profile: (profile ? JSON.parse(JSON.stringify(profile)) : null) as SiteProfile | null,
+    };
+  } catch {
+    // DB not configured yet — fall back to mock data
+    return { projects: null, skills: null, profile: null };
+  }
+}
+
+export const revalidate = 60; // ISR — re-fetch every 60 seconds
+
+export default async function HomePage() {
+  const { projects, skills, profile } = await getData();
   const p = profile ?? DEFAULT_PROFILE;
 
   return (
