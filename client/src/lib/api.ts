@@ -1,29 +1,26 @@
-import { Project, Skill, ApiResponse } from './types';
+import { Project, Skill, SiteProfile, MfaChannel, ApiResponse } from './types';
 
-// Browser-side: uses /api which Next.js proxies to Express → cookies work same-origin.
-// Server-side (serverFetch): talks directly to Express to avoid an extra hop.
 const CLIENT_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
   const res = await fetch(`${CLIENT_BASE}${path}`, {
-    credentials: 'include',          // send cookies on every request
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   });
-
   const data = await res.json();
-
-  if (res.status === 401) {
-    // Let the caller handle 401 (admin page redirects to login)
-    throw new Error(data.message || 'Unauthorized');
-  }
-  if (!res.ok) {
-    throw new Error(data.message || `Request failed (${res.status})`);
-  }
+  if (res.status === 401) throw new Error(data.message || 'Unauthorized');
+  if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
   return data;
 }
 
 export const api = {
+  profile: {
+    get: () => request<SiteProfile>('/profile'),
+    update: (body: Partial<SiteProfile>) =>
+      request<SiteProfile>('/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  },
+
   projects: {
     list: () => request<Project[]>('/projects'),
     get: (id: string) => request<Project>(`/projects/${id}`),
@@ -31,8 +28,7 @@ export const api = {
       request<Project>('/projects', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: Partial<Project>) =>
       request<Project>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<void>(`/projects/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => request<void>(`/projects/${id}`, { method: 'DELETE' }),
   },
 
   skills: {
@@ -41,44 +37,41 @@ export const api = {
       request<Skill>('/skills', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: Partial<Skill>) =>
       request<Skill>(`/skills/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<void>(`/skills/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => request<void>(`/skills/${id}`, { method: 'DELETE' }),
   },
 
   auth: {
     login: (email: string, password: string) =>
-      request<{ requiresMfa: boolean; preAuthToken?: string }>('/auth/login', {
+      request<{ requiresMfa: boolean; mfaChannel?: MfaChannel; sessionToken?: string; preAuthToken?: string }>(
+        '/auth/login',
+        { method: 'POST', body: JSON.stringify({ email, password }) }
+      ),
+    verifyEmailOtp: (sessionToken: string, otp: string) =>
+      request<void>('/auth/verify-email-otp', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ sessionToken, otp }),
       }),
     verifyTotp: (preAuthToken: string, totpCode: string) =>
       request<void>('/auth/verify-totp', {
         method: 'POST',
         body: JSON.stringify({ preAuthToken, totpCode }),
       }),
-    setupTotp: () =>
-      request<{ qrCode: string; secret: string }>('/auth/setup-totp'),
+    setupTotp: () => request<{ qrCode: string; secret: string }>('/auth/setup-totp'),
     confirmTotp: (totpCode: string) =>
-      request<void>('/auth/confirm-totp', {
-        method: 'POST',
-        body: JSON.stringify({ totpCode }),
-      }),
+      request<void>('/auth/confirm-totp', { method: 'POST', body: JSON.stringify({ totpCode }) }),
+    enableEmailMfa: () => request<void>('/auth/enable-email-mfa', { method: 'POST' }),
+    disableMfa: () => request<void>('/auth/disable-mfa', { method: 'POST' }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
-    me: () => request<{ email: string; isTotpEnabled: boolean }>('/auth/me'),
+    me: () => request<{ email: string; mfaChannel: MfaChannel; isMfaEnabled: boolean }>('/auth/me'),
   },
 
   contact: {
     send: (name: string, email: string, message: string) =>
-      request<void>('/contact', {
-        method: 'POST',
-        body: JSON.stringify({ name, email, message }),
-      }),
+      request<void>('/contact', { method: 'POST', body: JSON.stringify({ name, email, message }) }),
   },
 };
 
-// ── Server Component helper ───────────────────────────────────────────────────
-// Called inside async Server Components (page.tsx). Talks directly to Express
-// because there is no browser proxy involved on the server side.
+// Server Component helper — talks directly to Express (server-to-server, no proxy)
 export async function serverFetch<T>(path: string): Promise<T | null> {
   const apiUrl = process.env.API_URL || 'http://localhost:5001/api';
   try {

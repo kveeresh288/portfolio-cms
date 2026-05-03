@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: portfolio-cms-api
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node dist/src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGO_URI
+        sync: false          # Set in Render dashboard
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false          # Your Vercel frontend URL
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false

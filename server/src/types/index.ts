@@ -22,12 +22,50 @@ export interface ISkill extends Document {
   order: number;
 }
 
+export type MfaChannel = 'email' | 'totp';
+
 export interface IUser extends Document {
   email: string;
   password: string;
-  totpSecret?: string;
-  isTotpEnabled: boolean;
+  mfaChannel: MfaChannel;
+  isMfaEnabled: boolean;
+  mfaSecret?: string;
   comparePassword(candidate: string): Promise<boolean>;
+}
+
+export interface IOtpSession extends Document {
+  sessionToken: string;
+  userId: string;
+  otpHash: string;
+  channel: 'email' | 'totp';
+  expiresAt: Date;
+  attempts: number;
+  verified: boolean;
+}
+
+export interface ISiteProfile extends Document {
+  hero: {
+    name: string;
+    badge: string;
+    roles: string[];
+    subtitle: string;
+  };
+  about: {
+    bio: string[];
+  };
+  contact: {
+    email: string;
+    phone: string;
+    workLocation: string;
+    workMapsUrl: string;
+    college: string;
+  };
+  social: {
+    github: string;
+    linkedin: string;
+    twitter: string;
+    resume: string;
+  };
 }
 
 export interface AuthRequest extends Request {

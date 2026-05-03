@@ -1,5 +1,5 @@
 import { serverFetch } from '@/lib/api';
-import { Project, Skill } from '@/lib/types';
+import { Project, Skill, SiteProfile, DEFAULT_PROFILE } from '@/lib/types';
 import { MOCK_PROJECTS, MOCK_SKILLS } from '@/data/mock';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -10,26 +10,27 @@ import Projects from '@/components/sections/Projects';
 import Resources from '@/components/sections/Resources';
 import Contact from '@/components/sections/Contact';
 
-// Navbar and Footer live here, not in the root layout,
-// so the /admin pages never inherit them.
 export default async function HomePage() {
-  const [projects, skills] = await Promise.all([
+  const [projects, skills, profile] = await Promise.all([
     serverFetch<Project[]>('/projects'),
     serverFetch<Skill[]>('/skills'),
+    serverFetch<SiteProfile>('/profile'),
   ]);
+
+  const p = profile ?? DEFAULT_PROFILE;
 
   return (
     <>
-      <Navbar />
+      <Navbar profile={p} />
       <main>
-        <Hero />
-        <About />
+        <Hero profile={p} />
+        <About profile={p} />
         <Skills skills={skills ?? MOCK_SKILLS} />
         <Projects projects={projects ?? MOCK_PROJECTS} />
         <Resources />
-        <Contact />
+        <Contact profile={p} />
       </main>
-      <Footer />
+      <Footer profile={p} />
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Lock, Menu, X } from 'lucide-react';
+import { SiteProfile } from '@/lib/types';
 
 const NAV_LINKS = [
   { href: '#about', label: 'About' },
@@ -12,7 +13,7 @@ const NAV_LINKS = [
   { href: '#contact', label: 'Contact' },
 ];
 
-export default function Navbar() {
+export default function Navbar({ profile }: { profile: SiteProfile }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -22,25 +23,24 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  const initials = profile.hero.name.split(' ').map((w) => w[0]).join('').toUpperCase();
+
   return (
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
         scrolled ? 'glass border-b border-white/10 shadow-lg shadow-black/20' : 'bg-transparent'
       }`}
     >
-      <nav className="section-container flex items-center justify-between h-16">
-        <Link href="/" className="font-heading text-xl font-bold text-gradient-cyan tracking-tight">
-          KV<span className="text-white/40">.</span>dev
+      <nav className="section-container flex items-center justify-between h-16 gap-4">
+        <Link href="/" className="font-heading text-xl font-bold text-gradient-cyan tracking-tight shrink-0">
+          {initials}<span className="text-white/40">.</span>dev
         </Link>
 
         {/* Desktop links */}
-        <ul className="hidden md:flex items-center gap-8">
+        <ul className="hidden md:flex items-center gap-6 lg:gap-8">
           {NAV_LINKS.map(({ href, label }) => (
             <li key={href}>
-              <a
-                href={href}
-                className="text-sm text-slate-400 hover:text-cyan-400 transition-colors duration-200"
-              >
+              <a href={href} className="text-sm text-slate-400 hover:text-cyan-400 transition-colors">
                 {label}
               </a>
             </li>
@@ -48,6 +48,16 @@ export default function Navbar() {
         </ul>
 
         <div className="hidden md:flex items-center gap-3">
+          {profile.social.resume && (
+            <a
+              href={profile.social.resume}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-slate-400 hover:text-white glass glass-hover px-3 py-1.5 rounded-lg transition-all"
+            >
+              Resume
+            </a>
+          )}
           <Link
             href="/admin"
             className="flex items-center gap-1.5 text-xs glass glass-hover text-slate-400 hover:text-cyan-400 px-3 py-1.5 rounded-lg transition-all"
@@ -57,7 +67,6 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Mobile menu button */}
         <button
           className="md:hidden text-slate-400 hover:text-white transition-colors"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -67,25 +76,37 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden glass border-t border-white/10">
-          <ul className="section-container py-4 flex flex-col gap-3">
+          <ul className="section-container py-4 flex flex-col gap-2">
             {NAV_LINKS.map(({ href, label }) => (
               <li key={href}>
                 <a
                   href={href}
-                  className="block text-slate-300 hover:text-cyan-400 transition-colors py-1"
+                  className="block text-slate-300 hover:text-cyan-400 transition-colors py-2 text-sm"
                   onClick={() => setMenuOpen(false)}
                 >
                   {label}
                 </a>
               </li>
             ))}
-            <li>
+            {profile.social.resume && (
+              <li>
+                <a
+                  href={profile.social.resume}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-slate-300 hover:text-cyan-400 transition-colors py-2 text-sm"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Resume ↗
+                </a>
+              </li>
+            )}
+            <li className="pt-1 border-t border-white/10">
               <Link
                 href="/admin"
-                className="flex items-center gap-1.5 text-slate-400 hover:text-cyan-400 transition-colors py-1"
+                className="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors py-2 text-sm"
                 onClick={() => setMenuOpen(false)}
               >
                 <Lock size={14} />

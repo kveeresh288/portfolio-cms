@@ -2,45 +2,46 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, FolderKanban, Cpu, LogOut, QrCode, Menu, X, ShieldCheck } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  LayoutDashboard, FolderKanban, Cpu, LogOut, QrCode, Menu, X,
+  ShieldCheck, Mail, Smartphone, ShieldOff, User as UserIcon,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { MfaChannel } from '@/lib/types';
 import ProjectTable from '@/components/admin/ProjectTable';
 import SkillTable from '@/components/admin/SkillTable';
+import ProfileEditor from '@/components/admin/ProfileEditor';
 
-type Tab = 'overview' | 'projects' | 'skills';
+type Tab = 'overview' | 'projects' | 'skills' | 'profile';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-
-  // ── Layout ─────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ── Auth ───────────────────────────────────────────────────────────────────
   const [userEmail, setUserEmail] = useState('');
-  const [isTotpEnabled, setIsTotpEnabled] = useState(false);
+  const [mfaChannel, setMfaChannel] = useState<MfaChannel>('email');
+  const [isMfaEnabled, setIsMfaEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ── Overview counts — filled by ProjectTable / SkillTable callbacks ────────
   const [projectCount, setProjectCount] = useState(0);
   const [featuredCount, setFeaturedCount] = useState(0);
   const [skillCount, setSkillCount] = useState(0);
 
-  // ── TOTP setup ─────────────────────────────────────────────────────────────
+  // TOTP setup
   const [qrCode, setQrCode] = useState('');
   const [totpConfirmCode, setTotpConfirmCode] = useState('');
   const [confirmingTotp, setConfirmingTotp] = useState(false);
-
-  // ── Bootstrap: only fetch session info — tables fetch their own data ───────
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const me = await api.auth.me();
       setUserEmail(me.data?.email ?? '');
-      setIsTotpEnabled(me.data?.isTotpEnabled ?? false);
+      setMfaChannel(me.data?.mfaChannel ?? 'email');
+      setIsMfaEnabled(me.data?.isMfaEnabled ?? false);
     } catch {
       toast.error('Session expired — please log in again');
       router.push('/admin/login');
@@ -51,12 +52,21 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Auth handlers ──────────────────────────────────────────────────────────
-
   const handleLogout = async () => {
     await api.auth.logout().catch(() => null);
     router.push('/admin/login');
     router.refresh();
+  };
+
+  const handleEnableEmailMfa = async () => {
+    try {
+      await api.auth.enableEmailMfa();
+      setMfaChannel('email');
+      setIsMfaEnabled(true);
+      toast.success('Email OTP MFA enabled');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed');
+    }
   };
 
   const handleSetupTotp = async () => {
@@ -73,10 +83,11 @@ export default function AdminDashboardPage() {
     setConfirmingTotp(true);
     try {
       await api.auth.confirmTotp(totpConfirmCode);
-      toast.success('TOTP 2FA enabled!');
+      toast.success('Authenticator app MFA enabled');
       setQrCode('');
       setTotpConfirmCode('');
-      setIsTotpEnabled(true);
+      setMfaChannel('totp');
+      setIsMfaEnabled(true);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Invalid code');
     } finally {
@@ -84,10 +95,22 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const NAV_ITEMS = [
-    { id: 'overview' as Tab, icon: LayoutDashboard, label: 'Overview' },
-    { id: 'projects' as Tab, icon: FolderKanban, label: 'Projects' },
-    { id: 'skills' as Tab, icon: Cpu, label: 'Skills' },
+  const handleDisableMfa = async () => {
+    if (!confirm('Disable MFA? Your account will only require a password to log in.')) return;
+    try {
+      await api.auth.disableMfa();
+      setIsMfaEnabled(false);
+      toast.success('MFA disabled');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed');
+    }
+  };
+
+  const NAV: { id: Tab; icon: typeof LayoutDashboard; label: string }[] = [
+    { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+    { id: 'projects', icon: FolderKanban, label: 'Projects' },
+    { id: 'skills', icon: Cpu, label: 'Skills' },
+    { id: 'profile', icon: UserIcon, label: 'Profile' },
   ];
 
   if (loading) {
@@ -100,157 +123,135 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen flex bg-bg">
-
-      {/* ── Sidebar ───────────────────────────────────────────────────────────
-          mobile: fixed, slides in/out via transform
-          desktop (md+): static in the flex row
-      ──────────────────────────────────────────────────────────────────────── */}
-      <aside
-        className={`
-          fixed inset-y-0 left-0 z-40 w-64
-          glass border-r border-white/10
-          flex flex-col
-          transition-transform duration-300
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:static md:translate-x-0 md:flex md:shrink-0
-        `}
-      >
-        {/* Brand */}
+      {/* Sidebar */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 w-64
+        glass border-r border-white/10 flex flex-col
+        transition-transform duration-300
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:static md:translate-x-0 md:flex md:shrink-0
+      `}>
         <div className="p-5 border-b border-white/10 shrink-0">
           <p className="font-heading font-black text-gradient-cyan text-lg leading-none">KV.dev CMS</p>
           <p className="text-xs text-slate-500 mt-1 truncate">{userEmail}</p>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              onClick={() => { setTab(id); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+          {NAV.map(({ id, icon: Icon, label }) => (
+            <button key={id} onClick={() => { setTab(id); setSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border ${
                 tab === id
-                  ? 'bg-cyan-400/10 text-cyan-400 border border-cyan-400/20'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Icon size={16} />
-              {label}
+                  ? 'bg-cyan-400/10 text-cyan-400 border-cyan-400/20'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border-transparent'
+              }`}>
+              <Icon size={16} /> {label}
             </button>
           ))}
         </nav>
 
-        {/* Bottom actions */}
+        {/* MFA status + security actions */}
         <div className="p-3 border-t border-white/10 space-y-1 shrink-0">
-          {!isTotpEnabled && (
-            <button
-              onClick={handleSetupTotp}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-amber-400 hover:bg-amber-400/10 transition-all border border-transparent"
-            >
-              <QrCode size={16} />
-              Enable 2FA
-            </button>
+          {/* MFA status indicator */}
+          <div className={`flex items-center gap-2 px-3 py-2 text-xs rounded-xl ${
+            isMfaEnabled ? 'text-emerald-400 bg-emerald-400/5' : 'text-amber-400 bg-amber-400/5'
+          }`}>
+            {isMfaEnabled ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
+            {isMfaEnabled
+              ? `2FA: ${mfaChannel === 'email' ? 'Email OTP' : 'Authenticator'}`
+              : '2FA: Not enabled'}
+          </div>
+
+          {/* MFA setup buttons */}
+          {!isMfaEnabled && (
+            <>
+              <button onClick={handleEnableEmailMfa}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-amber-400 hover:bg-amber-400/10 transition-all border border-transparent">
+                <Mail size={14} /> Enable Email OTP
+              </button>
+              <button onClick={handleSetupTotp}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-amber-400 hover:bg-amber-400/10 transition-all border border-transparent">
+                <Smartphone size={14} /> Setup Authenticator
+              </button>
+            </>
           )}
-          {isTotpEnabled && (
-            <div className="flex items-center gap-2 px-3 py-2 text-xs text-emerald-400">
-              <ShieldCheck size={14} />
-              2FA Active
-            </div>
+          {isMfaEnabled && (
+            <>
+              {mfaChannel === 'email' && (
+                <button onClick={handleSetupTotp}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-slate-400 hover:bg-white/5 hover:text-white transition-all border border-transparent">
+                  <Smartphone size={14} /> Switch to Authenticator
+                </button>
+              )}
+              {mfaChannel === 'totp' && (
+                <button onClick={handleEnableEmailMfa}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-slate-400 hover:bg-white/5 hover:text-white transition-all border border-transparent">
+                  <Mail size={14} /> Switch to Email OTP
+                </button>
+              )}
+              <button onClick={handleDisableMfa}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-red-400/70 hover:bg-red-400/10 hover:text-red-400 transition-all border border-transparent">
+                <ShieldOff size={14} /> Disable MFA
+              </button>
+            </>
           )}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-400/10 transition-all border border-transparent"
-          >
-            <LogOut size={16} />
-            Logout
+
+          <button onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-400/10 transition-all border border-transparent">
+            <LogOut size={16} /> Logout
           </button>
         </div>
       </aside>
 
-      {/* Sidebar overlay for mobile */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/60 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* ── Main ─────────────────────────────────────────────────────────────── */}
+      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-
-        {/* Top bar */}
-        <header className="glass border-b border-white/10 px-5 py-4 flex items-center gap-4 shrink-0">
-          <button
-            className="md:hidden text-slate-400 hover:text-white transition-colors"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Toggle menu"
-          >
+        <header className="glass border-b border-white/10 px-4 sm:px-5 py-4 flex items-center gap-4 shrink-0">
+          <button className="md:hidden text-slate-400 hover:text-white transition-colors"
+            onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <h1 className="font-heading font-bold text-white text-lg capitalize">
-            {NAV_ITEMS.find((n) => n.id === tab)?.label}
+          <h1 className="font-heading font-bold text-white text-base sm:text-lg capitalize">
+            {NAV.find((n) => n.id === tab)?.label}
           </h1>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 p-5 md:p-6 overflow-auto">
+        <main className="flex-1 p-4 sm:p-5 md:p-6 overflow-auto">
 
-          {/* TOTP setup panel — shows as an overlay card above all tab content */}
+          {/* TOTP QR panel */}
           <AnimatePresence>
             {qrCode && (
               <motion.div
-                initial={{ opacity: 0, y: -12, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -12, scale: 0.97 }}
-                transition={{ duration: 0.2 }}
-                className="glass border border-amber-400/40 rounded-2xl p-6 mb-6 max-w-xs"
+                initial={{ opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                className="glass border border-amber-400/40 rounded-2xl p-5 mb-5 max-w-xs"
               >
                 <h3 className="font-bold text-amber-400 mb-1 flex items-center gap-2 text-sm">
-                  <QrCode size={15} /> Scan QR with Authenticator App
+                  <QrCode size={14} /> Scan with Authenticator App
                 </h3>
-                <p className="text-xs text-slate-500 mb-4">
-                  Google Authenticator or Authy, then enter the 6-digit code below.
-                </p>
-                <img
-                  src={qrCode}
-                  alt="TOTP QR Code"
-                  className="w-44 h-44 rounded-xl mx-auto mb-4 border border-white/10"
-                />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="000000"
-                  value={totpConfirmCode}
-                  onChange={(e) => setTotpConfirmCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full text-center text-2xl tracking-[0.4em] font-mono py-2.5 glass rounded-xl text-white placeholder-slate-600 outline-none border border-white/10 focus:border-amber-400/60 transition-all mb-3"
-                  autoFocus
-                />
+                <p className="text-xs text-slate-500 mb-3">Use Google Authenticator or Authy</p>
+                <img src={qrCode} alt="TOTP QR Code" className="w-40 h-40 rounded-xl mx-auto mb-3 border border-white/10" />
+                <input type="text" inputMode="numeric" maxLength={6} placeholder="000000" value={totpConfirmCode}
+                  onChange={(e) => setTotpConfirmCode(e.target.value.replace(/\D/g, ''))} autoFocus
+                  className="w-full text-center text-xl tracking-[0.4em] font-mono py-2.5 glass rounded-xl text-white placeholder-slate-600 outline-none border border-white/10 focus:border-amber-400/60 transition-all mb-3" />
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleConfirmTotp}
-                    disabled={confirmingTotp || totpConfirmCode.length !== 6}
-                    className="flex-1 py-2 rounded-lg bg-amber-400 text-bg text-sm font-semibold disabled:opacity-50 transition-opacity"
-                  >
+                  <button onClick={handleConfirmTotp} disabled={confirmingTotp || totpConfirmCode.length !== 6}
+                    className="flex-1 py-2 rounded-lg bg-amber-400 text-bg text-sm font-semibold disabled:opacity-50">
                     {confirmingTotp ? 'Verifying…' : 'Confirm'}
                   </button>
-                  <button
-                    onClick={() => { setQrCode(''); setTotpConfirmCode(''); }}
-                    className="px-4 py-2 rounded-lg glass text-slate-400 text-sm hover:text-white transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={() => { setQrCode(''); setTotpConfirmCode(''); }}
+                    className="px-3 py-2 rounded-lg glass text-slate-400 text-sm">Cancel</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* ── Overview ─────────────────────────────────────────────────────
-              ProjectTable and SkillTable are ALWAYS mounted (hidden via CSS)
-              so their onCountChange fires immediately on page load.
-              This keeps the overview stats accurate without an extra fetch.
-          ──────────────────────────────────────────────────────────────────── */}
+          {/* Overview */}
           {tab === 'overview' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
               {[
                 { label: 'Projects', value: projectCount, color: 'text-cyan-400', glow: 'from-cyan-400/10 to-transparent' },
                 { label: 'Featured', value: featuredCount, color: 'text-amber-400', glow: 'from-amber-400/10 to-transparent' },
@@ -265,20 +266,14 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* Always rendered — CSS controls visibility to avoid unmount/remount on tab switch */}
+          {/* Always-mounted tables (hidden via CSS to avoid remounts) */}
           <div className={tab === 'projects' ? '' : 'hidden'}>
-            <ProjectTable
-              onCountChange={(total, featured) => {
-                setProjectCount(total);
-                setFeaturedCount(featured);
-              }}
-            />
+            <ProjectTable onCountChange={(total, featured) => { setProjectCount(total); setFeaturedCount(featured); }} />
           </div>
-
           <div className={tab === 'skills' ? '' : 'hidden'}>
             <SkillTable onCountChange={setSkillCount} />
           </div>
-
+          {tab === 'profile' && <ProfileEditor />}
         </main>
       </div>
     </div>

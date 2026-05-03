@@ -9,6 +9,7 @@ import authRoutes from './routes/authRoutes';
 import projectRoutes from './routes/projectRoutes';
 import skillRoutes from './routes/skillRoutes';
 import contactRoutes from './routes/contactRoutes';
+import profileRoutes from './routes/profileRoutes';
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/profile', profileRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

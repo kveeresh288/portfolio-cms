@@ -5,8 +5,12 @@ import { IUser } from '../types';
 const UserSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
-  totpSecret: { type: String, select: false },
-  isTotpEnabled: { type: Boolean, default: false },
+  // 'email' = send OTP via email; 'totp' = authenticator app
+  mfaChannel: { type: String, enum: ['email', 'totp'], default: 'email' },
+  // false on first install; true once admin sets up MFA
+  isMfaEnabled: { type: Boolean, default: false },
+  // Base32 TOTP secret — only populated when mfaChannel === 'totp'
+  mfaSecret: { type: String, select: false },
 });
 
 UserSchema.pre('save', async function (next) {
