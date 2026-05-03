@@ -26,6 +26,7 @@ export default function About({ profile }: { profile: SiteProfile }) {
       border: 'border-cyan-400/30',
       title: 'Data Engineer Intern',
       org: `MyVoteLabs · ${contact.workLocation}`,
+      orgUrl: 'https://myvotelabs.com',
       desc: 'Building scalable data pipelines and cloud-based solutions for political analytics.',
       mapUrl: contact.workMapsUrl || null,
     },
@@ -35,6 +36,7 @@ export default function About({ profile }: { profile: SiteProfile }) {
       border: 'border-purple-400/30',
       title: 'B.E. Computer Science Engineering',
       org: contact.college,
+      orgUrl: null,
       desc: 'Graduating June 2026. Strong in DSA, OS, DBMS, and Software Engineering.',
       mapUrl: null,
     },
@@ -119,7 +121,7 @@ export default function About({ profile }: { profile: SiteProfile }) {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="space-y-4"
           >
-            {TIMELINE.map(({ icon: Icon, color, border, title, org, desc, mapUrl }, i) => (
+            {TIMELINE.map(({ icon: Icon, color, border, title, org, orgUrl, desc, mapUrl }, i) => (
               <motion.div
                 key={title}
                 initial={{ opacity: 0, y: 16 }}
@@ -133,11 +135,23 @@ export default function About({ profile }: { profile: SiteProfile }) {
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-white text-sm leading-snug">{title}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{org}</p>
+                    {orgUrl ? (
+                      <a
+                        href={orgUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-cyan-400 hover:text-cyan-300 mt-0.5 inline-flex items-center gap-1 transition-colors group"
+                      >
+                        {org}
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                      </a>
+                    ) : (
+                      <p className="text-xs text-slate-400 mt-0.5">{org}</p>
+                    )}
                     {desc && <p className="text-xs text-slate-500 mt-2 leading-relaxed">{desc}</p>}
                     {mapUrl && (
                       <a href={mapUrl} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 mt-2 transition-colors">
+                        className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-cyan-400 mt-2 transition-colors">
                         <MapPin size={10} /> View on Maps
                       </a>
                     )}
