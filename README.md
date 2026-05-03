@@ -10,8 +10,8 @@ The admin panel is secured with the same dual-channel MFA architecture as the [S
 
 | Layer | URL |
 |---|---|
-| Frontend | `https://your-app.vercel.app` |
-| Backend API | `https://your-backend.onrender.com/api/health` |
+| Frontend | https://client-lilac-zeta-41.vercel.app |
+| Backend API | *(deploy to Render — see below)* |
 
 ---
 
