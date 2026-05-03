@@ -1,19 +1,28 @@
 import { Project, Skill, ApiResponse } from './types';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+// Browser-side: uses /api which Next.js proxies to Express → cookies work same-origin.
+// Server-side (serverFetch): talks directly to Express to avoid an extra hop.
+const CLIENT_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
+  const res = await fetch(`${CLIENT_BASE}${path}`, {
+    credentials: 'include',          // send cookies on every request
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   });
+
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Request failed');
+
+  if (res.status === 401) {
+    // Let the caller handle 401 (admin page redirects to login)
+    throw new Error(data.message || 'Unauthorized');
+  }
+  if (!res.ok) {
+    throw new Error(data.message || `Request failed (${res.status})`);
+  }
   return data;
 }
 
-// Projects
 export const api = {
   projects: {
     list: () => request<Project[]>('/projects'),
@@ -47,20 +56,29 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ preAuthToken, totpCode }),
       }),
-    setupTotp: () => request<{ qrCode: string; secret: string }>('/auth/setup-totp'),
+    setupTotp: () =>
+      request<{ qrCode: string; secret: string }>('/auth/setup-totp'),
     confirmTotp: (totpCode: string) =>
-      request<void>('/auth/confirm-totp', { method: 'POST', body: JSON.stringify({ totpCode }) }),
+      request<void>('/auth/confirm-totp', {
+        method: 'POST',
+        body: JSON.stringify({ totpCode }),
+      }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     me: () => request<{ email: string; isTotpEnabled: boolean }>('/auth/me'),
   },
 
   contact: {
     send: (name: string, email: string, message: string) =>
-      request<void>('/contact', { method: 'POST', body: JSON.stringify({ name, email, message }) }),
+      request<void>('/contact', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, message }),
+      }),
   },
 };
 
-// Server-side fetch helper (no credentials, used in Next.js Server Components)
+// ── Server Component helper ───────────────────────────────────────────────────
+// Called inside async Server Components (page.tsx). Talks directly to Express
+// because there is no browser proxy involved on the server side.
 export async function serverFetch<T>(path: string): Promise<T | null> {
   const apiUrl = process.env.API_URL || 'http://localhost:5001/api';
   try {

@@ -25,8 +25,7 @@ export default function AdminLoginPage() {
     setLoading(true);
     try {
       const res = await api.auth.login(email, password);
-      if (!res.data) throw new Error('Login failed');
-      if (res.data.requiresMfa && res.data.preAuthToken) {
+      if (res.data?.requiresMfa && res.data.preAuthToken) {
         setPreAuthToken(res.data.preAuthToken);
         setStep('totp');
         toast.success('Enter your authenticator code');
